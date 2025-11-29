@@ -1,0 +1,4 @@
+tiktok.com	TRUE	/	FALSE	0	sessionid	4d34cbdb26ac58bba1ea4d7fd3343687
+tiktok.com	TRUE	/	FALSE	0	sid_tt	4d34cbdb26ac58bba1ea4d7fd3343687
+tiktok.com	TRUE	/	FALSE	0	sid_guard	4d34cbdb26ac58bba1ea4d7fd3343687
+tiktok.com	TRUE	/	FALSE	0	uid	MEIEDFmaAX...

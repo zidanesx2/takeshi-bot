@@ -1,0 +1,7 @@
+[SkippedMaps]
+Map2=Z City
+Map3=Voocha Village
+Map4=Green Planet
+Map5=Demon Forest
+Map6=Leaf Village
+Map7=None
