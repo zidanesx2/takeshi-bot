@@ -1,6 +1,5 @@
 const path = require("path");
 const fs = require("fs");
-const readline = require("readline");
 const {
   default: makeWASocket,
   DisconnectReason,
@@ -27,28 +26,41 @@ const msgRetryCounterCache = new NodeCache();
 
 let sock = null;
 
-/**
- * Função para fazer pergunta no terminal
- */
-function question(prompt) {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
+// 📁 Caminho do arquivo de código de autenticação
+const AUTH_CODE_FILE = path.resolve(__dirname, "..", "auth-code.json");
 
-  return new Promise((resolve) => {
-    rl.question(prompt, (answer) => {
-      rl.close();
-      resolve(answer);
-    });
-  });
+/**
+ * Salvar código de autenticação
+ */
+function saveAuthCode(authCode) {
+  try {
+    fs.writeFileSync(AUTH_CODE_FILE, JSON.stringify({ authCode, savedAt: new Date().toISOString() }, null, 2));
+    console.log("\n");
+    successLog("✅ Código de autenticação salvo!");
+    console.log(`📄 Arquivo: ${AUTH_CODE_FILE}`);
+    console.log("💾 Você pode usar este código para conectar rapidamente no futuro!\n");
+  } catch (error) {
+    errorLog("Erro ao salvar código de autenticação:", error);
+  }
 }
 
 /**
- * Extrair apenas números de uma string
+ * Carregar código de autenticação salvo
  */
-function onlyNumbers(str) {
-  return str.replace(/\D/g, "");
+function loadAuthCode() {
+  try {
+    if (fs.existsSync(AUTH_CODE_FILE)) {
+      const data = fs.readFileSync(AUTH_CODE_FILE, "utf-8");
+      const { authCode } = JSON.parse(data);
+      console.log("\n");
+      infoLog("📌 Código de autenticação encontrado!");
+      console.log(`🔑 Seu código: ${authCode}\n`);
+      return authCode;
+    }
+  } catch (error) {
+    errorLog("Erro ao carregar código de autenticação:", error);
+  }
+  return null;
 }
 
 async function getMessage(key) {
@@ -78,63 +90,14 @@ async function connect() {
 
   sock = socket;
 
-  // 🔑 Verificar se precisa de código de pareamento
-  if (!socket.authState.creds.registered) {
-    warningLog("Credenciais ainda não configuradas!");
-
-    console.log("\n");
-    infoLog('Informe o número de telefone do bot (exemplo: "5511920202020"):');
-
-    const phoneNumber = await question("📱 Número de telefone: ");
-
-    if (!phoneNumber) {
-      errorLog("Número de telefone inválido! Tente novamente com npm start.");
-      process.exit(1);
-    }
-
-    try {
-      console.log("\n");
-      infoLog("Gerando código de pareamento...");
-      
-      const code = await socket.requestPairingCode(onlyNumbers(phoneNumber));
-
-      console.log("\n");
-      console.log("╔════════════════════════════════════════════════════════════╗");
-      console.log("║           🔌 ESCOLHA A FORMA DE CONEXÃO 🔌                ║");
-      console.log("╠════════════════════════════════════════════════════════════╣");
-      console.log("║                                                            ║");
-      console.log("║  OPÇÃO 1️⃣  - CÓDIGO DE PAREAMENTO                         ║");
-      console.log("║  Use este código para conectar:                           ║");
-      console.log("║                                                            ║");
-      console.log(`║  🔑 CÓDIGO: ${code}                                          ║`);
-      console.log("║                                                            ║");
-      console.log("║  Passos:                                                   ║");
-      console.log("║  1. Abra o WhatsApp                                        ║");
-      console.log("║  2. Vá em Configurações > Dispositivos Vinculados         ║");
-      console.log("║  3. Clique em Vincular um Dispositivo                     ║");
-      console.log("║  4. Digite o código acima                                 ║");
-      console.log("║                                                            ║");
-      console.log("║  OPÇÃO 2️⃣  - QR CODE                                      ║");
-      console.log("║  Se preferir, também pode escanear o QR Code              ║");
-      console.log("║                                                            ║");
-      console.log("╚════════════════════════════════════════════════════════════╝");
-      console.log("\n");
-
-      successLog(`Código de pareamento gerado: ${code}`);
-    } catch (error) {
-      errorLog("Erro ao gerar código de pareamento:", error.message);
-      process.exit(1);
-    }
-  }
-
   socket.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
-    // 📱 Mostrar QR Code se disponível
+    // 📱 Mostrar QR Code no terminal
     if (qr) {
       const QRCode = require("qrcode-terminal");
       console.log("\n");
-      infoLog("📱 QR Code gerado! Escaneie com seu WhatsApp:");
+      infoLog("📱 QR Code gerado! Escaneie com seu WhatsApp");
       QRCode.generate(qr, { small: true });
       console.log("\n");
     }
@@ -183,6 +146,15 @@ async function connect() {
       }
     } else if (connection === "open") {
       successLog("Fui conectado com sucesso!");
+      
+      // 💾 Salvar código de autenticação após conexão bem-sucedida
+      if (socket.user?.id) {
+        const authCode = Buffer.from(socket.user.id).toString("base64");
+        saveAuthCode(authCode);
+      }
+      
+      // 📌 Mostrar código salvo
+      loadAuthCode();
     } else {
       infoLog("Atualizando conexão...");
     }
@@ -196,4 +168,6 @@ async function connect() {
 module.exports = {
   connect,
   getSock: () => sock,
+  saveAuthCode,
+  loadAuthCode,
 };
